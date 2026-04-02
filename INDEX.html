@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jay Janardhan Tours and Travels | All India Permit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <style>
+        .hero-gradient { 
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1920&q=80'); 
+            background-size: cover; background-position: center; 
+        }
+        #map { height: 350px; width: 100%; border-radius: 1rem; border: 4px solid white; z-index: 10 !important; position: relative; }
+        #bookingModal, #invoiceModal, #exploreModal, #ownerDashboard { display: none; }
+        .leaflet-routing-container { display: none; }
+        .trip-type-btn.active, .dept-btn.active { background-color: #ea580c; color: white; border-color: #ea580c; }
+        @media print {
+            body * { visibility: hidden; }
+            #invoiceCapture, #invoiceCapture * { visibility: visible; }
+            #invoiceCapture { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+            .print-hide { display: none !important; }
+        }
+        .trending-card { position: relative; overflow: hidden; border-radius: 1rem; cursor: pointer; height: 180px; }
+        .trending-card img { transition: 0.5s; width: 100%; height: 100%; object-fit: cover; }
+        .trending-card:hover img { transform: scale(1.1); }
+        .trending-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); display: flex; align-items: flex-end; padding: 1.2rem; }
+        
+        .slider-wrapper { position: relative; display: flex; align-items: center; }
+        .dest-slider { display: flex; overflow-x: auto; scroll-behavior: smooth; gap: 1.5rem; scrollbar-width: none; padding: 10px 0; width: 100%; }
+        .dest-slider::-webkit-scrollbar { display: none; }
+        .slider-btn { position: absolute; background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10; cursor: pointer; border: 1px solid #eee; }
+        .btn-left { left: -20px; }
+        .btn-right { right: -20px; }
+        .dest-card { min-width: 250px; flex-shrink: 0; transition: 0.3s; }
+        .dest-card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-900">
+
+    <nav class="sticky top-0 z-[100] bg-white shadow-md border-b-2 border-orange-500">
+        <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="https://i.postimg.cc/V654Xd8h/jayjanardhanlogo.png" alt="JJ" class="h-12 w-12 rounded-full border border-orange-500">
+                <div class="text-left">
+                    <h1 class="text-xl font-black text-orange-600 uppercase leading-none">Jay Janardhan</h1>
+                    <p class="text-[9px] font-bold text-gray-500 tracking-[0.2em] uppercase">Tours and Travels</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-6">
+                <a href="tel:9763111320" class="hidden md:flex items-center font-bold hover:text-orange-600 transition"><i class="fas fa-phone-alt text-orange-600 mr-2"></i> 9763111320</a>
+                <a href="https://wa.me/919763111320" target="_blank" class="bg-green-600 text-white px-5 py-2 rounded-lg font-bold flex items-center shadow-lg transition hover:bg-green-700">
+                    <i class="fab fa-whatsapp mr-2"></i> WhatsApp
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero-gradient py-12 px-6">
+        <div class="max-w-7xl mx-auto text-center text-white">
+            <h2 class="text-3xl md:text-5xl font-black uppercase mb-2 tracking-tighter italic">Your Trusted Travel Partner</h2>
+            <p class="text-lg md:text-xl opacity-90 font-light italic mb-10">Safe, Comfortable & Affordable Group Journeys Across All India</p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 text-left">
+                <div class="bg-white/10 backdrop-blur-md p-8 rounded-2xl border border-white/20">
+                    <div class="flex mb-4 bg-white/20 p-1 rounded-lg">
+                        <button id="oneWayBtn" onclick="setTripType('One Way')" class="trip-type-btn active flex-1 py-2 text-xs font-bold uppercase rounded-md transition">One Way</button>
+                        <button id="roundTripBtn" onclick="setTripType('Round Trip')" class="trip-type-btn flex-1 py-2 text-xs font-bold uppercase rounded-md transition text-white">Round Trip</button>
+                    </div>
+                    <div class="space-y-4 text-gray-900">
+                        <input id="custName" type="text" placeholder="Customer Name (e.g. Swara) *" class="w-full p-3 rounded-lg font-bold outline-none border-2 border-transparent focus:border-orange-500 shadow-inner" required>
+    			        <input id="custPhone" type="tel" placeholder="Contact Number (e.g. 888XXXX999) *" class="w-full p-3 rounded-lg font-bold outline-none border-2 border-transparent focus:border-orange-500 shadow-inner" required>
+    			        <input id="custEmail" type="email" placeholder="Email Address (e.g. xyz@gmail.com) *" class="w-full p-3 rounded-lg font-bold outline-none border-2 border-transparent focus:border-orange-500 shadow-inner" required>
+                        <input id="startNode" type="text" placeholder="Pickup Location (e.g. Nashik)" class="w-full p-3 rounded-lg font-bold outline-none border-2 border-transparent focus:border-orange-500 shadow-inner">
+                        <input id="endNode" type="text" placeholder="Drop Location (e.g. Mumbai)" class="w-full p-3 rounded-lg font-bold outline-none border-2 border-transparent focus:border-orange-500 shadow-inner">
+                        <button onclick="calculateTrip()" class="w-full bg-orange-600 text-white font-black py-4 rounded-xl hover:bg-orange-700 uppercase shadow-2xl transition-all">Calculate Billable Distance</button>
+                    </div>
+                </div>
+                <div>
+                    <div id="map"></div>
+                    <div id="trip-stats" class="hidden bg-white mt-4 p-5 rounded-xl shadow-xl border-l-8 border-orange-500 text-gray-900">
+                        <div class="flex justify-between items-center"><p class="text-[10px] text-gray-400 font-black uppercase tracking-widest">Total Billable KM</p><p id="dist-display" class="text-3xl font-black">0 km</p></div>
+                        <p class="text-[9px] text-gray-500 font-bold uppercase italic mt-1">Includes Base-to-Base movement (Base: Nashik).</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="max-w-7xl mx-auto px-6 py-16 bg-white overflow-hidden">
+        <div class="mb-8"><h2 class="text-3xl font-black text-gray-900">Trending Destinations</h2><p class="text-gray-500 font-bold">Most popular choices for travelers Across India</p></div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
+            <div class="trending-card" onclick="exploreDestination('New Delhi')"><img src="https://i.postimg.cc/76Z3hX8Z/Delhi-government-holiday-list-2024.jpg"><div class="trending-overlay"><h3 class="text-white font-black text-sm">New Delhi 🇮🇳</h3></div></div>
+            <div class="trending-card" onclick="exploreDestination('Bangalore')"><img src="https://i.postimg.cc/FHc5Cg6J/Vidhana-Soudha-Bangalore.jpg"><div class="trending-overlay"><h3 class="text-white font-black text-sm">Bangalore 🇮🇳</h3></div></div>
+            <div class="trending-card" onclick="exploreDestination('Mumbai')"><img src="https://i.postimg.cc/4yzVF0pK/Waah-Taj.jpg"><div class="trending-overlay"><h3 class="text-white font-black text-sm">Mumbai 🇮🇳</h3></div></div>
+            <div class="trending-card" onclick="exploreDestination('Chennai')"><img src="https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=400&q=80"><div class="trending-overlay"><h3 class="text-white font-black text-sm">Chennai 🇮🇳</h3></div></div>
+            <div class="trending-card" onclick="exploreDestination('Hyderabad')"><img src="https://i.postimg.cc/cHvVYRfJ/The-Business-Traveller-s-Guide-to-Hyderabad.jpg"><div class="trending-overlay"><h3 class="text-white font-black text-sm">Hyderabad 🇮🇳</h3></div></div>
+            <div class="trending-card" onclick="exploreDestination('Kolkata')"><img src="https://i.postimg.cc/Kv1Rzw1P/Another-lovely-shot-we-came-across-of-this-beautiful-monument-Victoria-Memorial-Kolkata-India.jpg"><div class="trending-overlay"><h3 class="text-white font-black text-sm">Kolkata 🇮🇳</h3></div></div>
+        </div>
+
+        <div class="max-w-2xl mx-auto mb-10"><div class="relative group"><input type="text" id="destSearch" onkeyup="filterDestinations()" placeholder="Search site across all departments..." class="w-full p-4 pl-12 bg-gray-100 border-2 border-transparent focus:border-orange-500 rounded-2xl font-bold outline-none shadow-inner"><i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500"></i></div></div>
+        
+        <div class="flex flex-wrap gap-3 mb-8">
+            <button onclick="changeDept('top')" class="dept-btn active px-6 py-2 border-2 border-gray-200 rounded-full font-black uppercase text-[10px]">Top Destinations</button>
+            <button onclick="changeDept('hill')" class="dept-btn px-6 py-2 border-2 border-gray-200 rounded-full font-black uppercase text-[10px]">Hill Stations</button>
+            <button onclick="changeDept('wildlife')" class="dept-btn px-6 py-2 border-2 border-gray-200 rounded-full font-black uppercase text-[10px]">Wildlife Safaris</button>
+            <button onclick="changeDept('history')" class="dept-btn px-6 py-2 border-2 border-gray-200 rounded-full font-black uppercase text-[10px]">Historical Expeditions</button>
+            <button onclick="changeDept('beach')" class="dept-btn px-6 py-2 border-2 border-gray-200 rounded-full font-black uppercase text-[10px]">Beaches Trip</button>
+            <button onclick="changeDept('spiritual')" class="dept-btn px-6 py-2 border-2 border-gray-200 rounded-full font-black uppercase text-[10px]">Devotional Places</button>
+        </div>
+
+        <div class="slider-wrapper">
+            <button class="slider-btn btn-left" onclick="slideDest(-1)"><i class="fas fa-chevron-left"></i></button>
+            <div id="destContainer" class="dest-slider"></div>
+            <button class="slider-btn btn-right" onclick="slideDest(1)"><i class="fas fa-chevron-right"></i></button>
+        </div>
+    </section>
+
+    <div id="exploreModal" class="fixed inset-0 z-[400] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white max-w-lg w-full rounded-[2rem] overflow-hidden shadow-2xl relative">
+            <button onclick="closeExplore()" class="absolute top-4 right-4 text-white bg-black/50 w-10 h-10 rounded-full flex items-center justify-center hover:bg-orange-600 transition z-[500]"><i class="fas fa-times"></i></button>
+            <img id="exploreImg" src="" class="w-full h-64 object-cover">
+            <div class="p-8 text-center">
+                <h3 id="exploreTitle" class="text-3xl font-black text-orange-600 uppercase italic mb-4">Place Name</h3>
+                <div id="exploreDesc" class="text-gray-600 text-sm leading-relaxed mb-8 text-left h-32 overflow-y-auto pr-2"></div>
+                <button id="exploreSetBtn" class="w-full bg-orange-600 text-white font-black py-4 rounded-xl uppercase hover:bg-gray-900 transition shadow-lg">Set as Drop Location <i class="fas fa-map-marker-alt ml-2"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <section id="fleet" class="max-w-7xl mx-auto px-6 py-20 text-center">
+        <h2 class="text-4xl font-black text-orange-600 uppercase italic underline tracking-tighter mb-16">Our Fleet</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div class="bg-white rounded-3xl shadow-xl border-2 border-gray-100 p-6"><img src="https://i.postimg.cc/8PRq3SBq/14seater-jpg.jpg" class="w-full h-48 object-cover rounded-xl mb-4"><h3 class="text-xl font-black uppercase">14 Seater Tempo</h3><p class="text-orange-600 font-black text-2xl my-2 italic">₹21 <span class="text-xs text-gray-400 font-normal">per/km</span></p><button onclick="openBooking('14 Seater Tempo', 21, 25)" class="w-full bg-gray-900 text-white py-3 rounded-xl font-black hover:bg-orange-600 transition uppercase">Book Now</button></div>
+            <div class="bg-white rounded-[2rem] shadow-2xl border-4 border-orange-500 p-6 transform md:scale-105 z-[10]"><div class="bg-orange-500 text-white text-[10px] font-black py-1 mb-2 rounded uppercase tracking-widest">Premium Choice</div><img src="https://i.postimg.cc/tRNJjYbS/50seater-jpg.jpg" class="w-full h-56 object-cover rounded-xl mb-4"><h3 class="text-2xl font-black uppercase">50 Seater Bus</h3><p class="text-gray-900 font-black text-3xl my-2 italic">₹55 <span class="text-xs text-gray-400 font-normal">per/km</span></p><button onclick="openBooking('50 Seater Bus', 55, 70)" class="w-full bg-orange-600 text-white py-4 rounded-xl font-black hover:bg-orange-700 transition uppercase">Enquire Now</button></div>
+            <div class="bg-white rounded-3xl shadow-xl border-2 border-gray-100 p-6"><img src="https://i.postimg.cc/kM6sYPdG/26seatertempo-jpg.jpg" class="w-full h-48 object-cover rounded-xl mb-4"><h3 class="text-xl font-black uppercase">26 Seater Tempo</h3><p class="text-orange-600 font-black text-2xl my-2 italic">₹30 <span class="text-xs text-gray-400 font-normal">per/km</span></p><button onclick="openBooking('26 Seater Tempo', 30, 38)" class="w-full bg-gray-900 text-white py-3 rounded-xl font-black hover:bg-orange-600 transition uppercase">Book Now</button></div>
+        </div>
+    </section>
+
+    <div id="bookingModal" class="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center">
+        <div class="bg-white rounded-[2rem] max-w-sm w-full p-8 shadow-2xl relative border-b-8 border-orange-500">
+            <button onclick="closeBooking()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+            <h3 id="modalTitle" class="text-2xl font-black uppercase text-orange-600 italic mb-6">Vehicle</h3>
+            <div class="space-y-4 text-left">
+                <button onclick="confirmBooking('Air Conditioned (AC)')" class="w-full border-2 border-blue-600 rounded-2xl p-4 hover:bg-blue-600 hover:text-white transition group"><div class="flex justify-between items-center mb-1"><span class="font-black text-lg italic">AC</span><span id="acKmRate" class="text-xs opacity-60 italic">Rate/km</span></div><p id="acPriceDisplay" class="font-black text-blue-600 group-hover:text-white text-xl italic">Total Bill: ₹0</p></button>
+                <button onclick="confirmBooking('Non-AC')" class="w-full border-2 border-orange-500 rounded-2xl p-4 hover:bg-orange-500 hover:text-white transition group"><div class="flex justify-between items-center mb-1"><span class="font-black text-lg italic">Non-AC</span><span id="nonAcKmRate" class="text-xs opacity-60 italic">Rate/km</span></div><p id="nonAcPriceDisplay" class="font-black text-orange-600 group-hover:text-white text-xl italic">Total Bill: ₹0</p></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="invoiceModal" class="fixed inset-0 z-[300] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white max-w-2xl w-full p-8 rounded-lg shadow-2xl relative">
+            <button onclick="closeInvoice()" class="absolute top-4 right-4 text-gray-400 hover:text-red-600 transition-all z-[350] print-hide"><i class="fas fa-times-circle text-3xl"></i></button>
+            <div id="invoiceCapture" class="p-6 border-2 border-gray-100 rounded-lg">
+                <div class="flex justify-between items-start border-b-4 border-orange-500 pb-4 mb-6 text-left">
+                    <div class="flex items-center space-x-3">
+                        <img src="https://i.postimg.cc/V654Xd8h/jayjanardhanlogo.png" alt="JJ Logo" class="h-14 w-14 object-contain">
+                        <div>
+                            <h2 class="text-2xl font-black text-orange-600 uppercase leading-none">Jay Janardhan</h2>
+                            <p class="text-[9px] font-bold text-gray-500 tracking-[0.2em] uppercase">Tours and Travels</p>
+                            <p class="text-[10px] font-bold italic text-gray-800 uppercase mt-2">Pravin Nikam: 9763111320</p>
+                        </div>
+                    </div>
+                    <div class="text-right text-gray-800"><h4 class="text-lg font-black uppercase leading-none">Trip Invoice</h4><p id="invDate" class="text-[10px] text-gray-500 mt-2 italic leading-none">Date: --</p></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-6 text-sm text-left">
+                    <div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 italic">Customer Details</p>
+                        <p class="font-bold">Customer: <span id="invCust" class="text-orange-600 font-black">--</span></p>
+                        <p class="font-bold text-xs">Phone: <span id="invPhone" class="text-gray-600 font-normal">--</span></p>
+                        <p class="font-bold text-xs">Email: <span id="invEmail" class="text-gray-600 font-normal">--</span></p>
+                        <p class="font-bold text-xs mt-2">Pickup: <span id="invFrom" class="text-gray-600 font-normal">--</span></p>
+                        <p class="font-bold text-xs">Drop: <span id="invTo" class="text-gray-600 font-normal">--</span></p>
+                    </div>
+                    <div class="text-right"><p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 italic">Billing Detail</p><p class="font-bold text-xs">Journey Route: <span id="invTripDist" class="text-gray-600 font-normal">0 km</span></p><p class="font-bold text-xs">Base Route: <span id="invGarageDist" class="text-gray-600 font-normal">0 km</span></p><p class="text-3xl font-black italic mt-1 text-orange-600"><span id="invTotalDist">0</span> KM</p></div>
+                </div>
+                <table class="w-full text-left mb-6 border-t border-b text-sm italic">
+                    <thead><tr class="bg-gray-50 uppercase text-[10px] font-black"><th class="p-3">Vehicle Description</th><th class="p-3 text-right">Rate/KM</th><th class="p-3 text-right">Estimated Total</th></tr></thead>
+                    <tbody><tr><td id="invVehicle" class="p-3 font-bold text-orange-600 uppercase">--</td><td id="invRate" class="p-3 text-right">₹0</td><td id="invTotalBill" class="p-3 text-right font-black text-xl">₹0</td></tr></tbody>
+                </table>
+                <div class="bg-orange-50 p-4 rounded-xl border-l-4 border-orange-500 text-left"><p class="text-[10px] font-black uppercase mb-2 italic underline text-orange-600">Important Booking Terms</p><ul class="text-[10px] space-y-1 font-bold uppercase leading-relaxed text-gray-700"><li>1. Toll Taxes, Parking Fees, Interstate State Taxes, and Permits are to be paid directly by the hirer as incurred.</li><li>2. Base located in Nashik. Billing base-to-base.</li><li>3. Note that additional hours or kilometers beyond the agreed package will attract extra per-unit charges.</li></ul></div>
+            </div>
+            <div class="mt-6 flex flex-row gap-2 print-hide">
+                <button onclick="window.print()" class="flex-1 bg-gray-200 text-gray-800 font-black py-4 rounded-xl uppercase text-[10px] hover:bg-gray-300 transition leading-none">
+			Save PDF
+    		</button>
+                <button onclick="sendToWhatsApp()" class="flex-1 bg-green-600 text-white font-black py-4 rounded-xl uppercase text-[10px] shadow-lg transition hover:bg-green-700 leading-none">
+            		WhatsApp
+    		</button>
+		<button onclick="closeInvoice()" class="flex-1 bg-red-600 text-white font-black py-4 rounded-xl uppercase text-[10px] shadow-lg transition hover:bg-red-700 leading-none">
+			Cancel
+    		</button>
+	</div>
+        </div>
+    </div>
+
+    <!-- Hidden Owner Dashboard -->
+    <div id="ownerDashboard" class="fixed inset-0 z-[600] bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white max-w-lg w-full p-8 rounded-2xl shadow-2xl relative overflow-y-auto max-h-[90vh]">
+            <button onclick="closeDashboard()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition z-[700]"><i class="fas fa-times-circle text-2xl"></i></button>
+            <h2 class="text-2xl font-black text-orange-600 uppercase mb-6 text-center italic underline tracking-tighter">Owner Dashboard</h2>
+            
+            <div id="loginSection">
+                <input id="adminPass" type="password" placeholder="Enter Admin Password" class="w-full p-3 border-2 rounded-lg mb-4 font-bold outline-none focus:border-orange-500">
+                <button onclick="verifyAdmin()" class="w-full bg-orange-600 text-white font-black py-3 rounded-xl uppercase hover:bg-orange-700 transition">Login</button>
+            </div>
+
+            <div id="adminPanel" style="display:none;">
+                <!-- REQUESTS QUEUE -->
+                <div class="mb-6">
+                    <h4 class="font-black text-[10px] uppercase mb-3 text-orange-600 italic">Pending Booking Requests</h4>
+                    <div id="requestQueue" class="space-y-3 max-h-64 overflow-y-auto pr-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-xl border-l-4 border-green-500">
+                        <h4 class="font-black text-[10px] uppercase mb-3 text-gray-400">Live Fleet Status (Approved)</h4>
+                        <div id="fleetStatus" class="space-y-2 text-[11px] font-bold">
+                            <div class="flex justify-between border-b pb-1"><span>14 Seater Tempo</span><span id="status-14" class="text-green-600">AVAILABLE</span></div>
+                            <div class="flex justify-between border-b pb-1"><span>50 Seater Bus</span><span id="status-50" class="text-green-600">AVAILABLE</span></div>
+                            <div class="flex justify-between border-b pb-1"><span>26 Seater Tempo</span><span id="status-26" class="text-green-600">AVAILABLE</span></div>
+                        </div>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-xl border-l-4 border-orange-500 text-left">
+                        <h4 class="font-black text-[10px] uppercase mb-1 text-orange-600">Master Database</h4>
+                        <a id="sheetLink" href="#" target="_blank" class="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg font-bold text-[9px] uppercase shadow-md">Open Sheets</a>
+                    </div>
+                </div>
+
+                <div class="bg-white border rounded-xl p-4 shadow-inner">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-black text-[10px] uppercase text-gray-400 italic">Trip History & Calendar</h4>
+                        <div class="flex items-center gap-3">
+                            <button onclick="changeMonth(-1)" class="text-gray-400 hover:text-orange-600"><i class="fas fa-chevron-left"></i></button>
+                            <span id="monthDisplay" class="text-[10px] font-black uppercase text-orange-600 tracking-tighter">Month Year</span>
+                            <button onclick="changeMonth(1)" class="text-gray-400 hover:text-orange-600"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[8px] font-black text-gray-300 mb-2">
+                        <div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div>
+                    </div>
+                    <div id="calendarDays" class="grid grid-cols-7 gap-1"></div>
+                </div>
+
+                <div id="dayDetail" class="mt-4 p-4 bg-gray-900 text-white rounded-xl hidden border-b-4 border-orange-500">
+                    <h5 id="detailDate" class="text-orange-500 font-black text-[10px] uppercase mb-3 italic tracking-widest underline">Day Report</h5>
+                    <div id="detailContent" class="space-y-3"></div>
+                </div>
+
+                <div class="text-center mt-8">
+                    <button onclick="logoutAdmin()" class="text-[9px] font-black text-gray-400 uppercase underline hover:text-red-500 transition">Logout Session</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-gray-900 text-white py-12 text-center border-t-4 border-orange-600">
+        <h3 class="text-2xl font-black text-orange-600 uppercase">Jay Janardhan Tours & Travels</h3>
+        <p onclick="openOwnerDashboard()" class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mt-2 cursor-pointer hover:text-white transition">Pravin Nikam | Nashik | © 2026</p>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+    <script>
+        // ⚠️ PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE
+        const DATABASE_URL = "https://script.google.com/macros/s/AKfycbzr-aG6KdeI_V70j34Cy8cwoqvv4kYqZRHyyy2fm10BUSe6zDALFdZ6iw26vRjW-ogi/exec";
+        // ⚠️ PASTE YOUR ACTUAL GOOGLE SHEET LINK HERE[cite: 5]
+        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQK0Q46ivt7SQavs64h9S1LpCeYqsg-h-YrpDH__Pge8cYQkNkTihjFIA74oe3cDAH5LZA2n8f8ucpz/pubhtml";
+
+        const destinations = [
+            // TOP TRENDING (6)
+            { name: "New Delhi", category: "top", img: "https://i.postimg.cc/76Z3hX8Z/Delhi-government-holiday-list-2024.jpg", desc: "India's capital city is a treasure trove of Mughal and Colonial history. Visit the iconic India Gate, the majestic Red Fort, and Humayun's Tomb. From the bustling narrow lanes of Old Delhi's Chandni Chowk to the wide boulevards of New Delhi, this city offers a unique blend of heritage, street food, and modern group tour experiences." },
+            { name: "Bangalore", category: "top", img: "https://i.postimg.cc/FHc5Cg6J/Vidhana-Soudha-Bangalore.jpg", desc: "Known as the Garden City of India, Bangalore is famous for its pleasant climate and lush greenery. Explore the historical Bangalore Palace, the massive Vidhana Soudha, and the botanical wonders of Lalbagh. It's the perfect starting point for group tours heading towards the scenic hills of Coorg or the royal heritage of Mysore." },
+            { name: "Mumbai", category: "top", img: "https://i.postimg.cc/4yzVF0pK/Waah-Taj.jpg", desc: "The City of Dreams is home to the world-famous Gateway of India and the scenic Marine Drive. Experience the heartbeat of India with visits to the Haji Ali Dargah, Elephanta Caves, and the vibrant film industry. Mumbai's unique coastal vibe and non-stop energy make it an essential destination for any grand All India group permit tour." },
+            { name: "Chennai", category: "top", img: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=400&q=80", desc: "The cultural gateway of South India, Chennai is famous for its traditional Dravidian temples and the long stretch of Marina Beach. Explore the historic Fort St. George and the ancient Santhome Cathedral. Chennai is a hub for culture and art, providing a spiritual and educational experience for large group expeditions." },
+            { name: "Hyderabad", category: "top", img: "https://i.postimg.cc/cHvVYRfJ/The-Business-Traveller-s-Guide-to-Hyderabad.jpg", desc: "The City of Pearls is a magnificent blend of Nizami heritage and high-tech modernity. No visit is complete without seeing the Charminar and the massive Golconda Fort. Indulge in world-famous Biryani and explore the cinematic wonders of Ramoji Film City. It's a top choice for families and groups looking for grand architecture and great food." },
+            { name: "Kolkata", category: "top", img: "https://i.postimg.cc/Kv1Rzw1P/Another-lovely-shot-we-came-across-of-this-beautiful-monument-Victoria-Memorial-Kolkata-India.jpg", desc: "The Cultural Capital of India, Kolkata is known for its British-era architecture and intellectual heritage. Visit the stunning Victoria Memorial and the iconic Howrah Bridge. Famous for its sweets and grand festivals like Durga Puja, Kolkata offers a rich, artistic atmosphere that is truly unique for every traveler." },
+
+            // HILL STATIONS (10)
+            { name: "Mahabaleshwar", category: "hill", img: "https://i.postimg.cc/7L5kMrkr/Travel-Diary-Mahabaleshwar.jpg", desc: "Nestled in the Sahyadri range, Mahabaleshwar is the strawberry capital of Maharashtra. It offers breathtaking views from Arthur's Seat and serene boat rides on Venna Lake. A must-visit for Nashik groups looking for a cool, misty weekend getaway." },
+            { name: "Mount Abu", category: "hill", img: "https://i.postimg.cc/qMB2L418/Monte-Abu.jpg", desc: "Rajasthan's only hill station, Mount Abu features the tranquil Nakki Lake and the world-famous Dilwara Jain Temples. It provides a cool oasis amidst the desert landscape, perfect for both spiritual and leisure group trips." },
+            { name: "Ooty", category: "hill", img: "https://i.postimg.cc/6QVQgG3z/Explore-the-Best-of-South-India-with-Our-Mysore-Ooty-Coorg-Tour-Package.jpg", desc: "Known as the Queen of the Nilgiris, Ooty is famous for its rolling tea gardens and the low humidity heritage toy train. Visit the Botanical Gardens and Pykara Lake for a refreshing nature experience in South India." },
+            { name: "Munnar", category: "hill", img: "https://i.postimg.cc/4NrN31HB/Munnar.jpg", desc: "Kerala's premier hill station is a vast expanse of emerald-green tea plantations. Explore Eravikulam National Park and enjoy the mist-covered mountains that make Munnar a top-rated destination for group tours." },
+            { name: "Nainital", category: "hill", img: "https://i.postimg.cc/d0JF7NsF/Hotels-Homestays-Resorts-in-Nainital-Uttarakhand-XTE-Recommendations.jpg", desc: "The Lake District of India is centered around the pear-shaped Naini Lake. Enjoy a cable car ride to Snow View Point and explore the vibrant Tibetan Market. It is one of the most beloved hill stations in North India." },
+            { name: "Mussoorie", category: "hill", img: "https://i.postimg.cc/Ss7DnVKh/Mussoorie-The-Queen-of-Hill-Stations.jpg", desc: "Overlooking the Doon Valley, Mussoorie is famous for Kempty Falls and its bustling Mall Road. It offers a nostalgic colonial charm and spectacular views of the Himalayan ranges." },
+            { name: "Shimla", category: "hill", img: "https://i.postimg.cc/nhj24nLP/Amazing-Shimla.jpg", desc: "The former summer capital of British India, Shimla is known for its neo-gothic architecture and the ridge. Ride the heritage toy train and walk through pine-scented forests." },
+            { name: "Manali", category: "hill", img: "https://i.postimg.cc/x82h7cXz/Planning-a-Honeymoon-in-Manali-Is-2-Nights-Enough.jpg", desc: "A hub for adventure and snow lovers, Manali serves as the gateway to the Solang Valley and Rohtang Pass. With its wooden temples and fast-flowing rivers, it's the ultimate destination for youth and families." },
+            { name: "Darjeeling", category: "hill", img: "https://i.postimg.cc/HL8NkQ54/Ferrocarril-de-montana-de-Darjeeling-Patrimonio-de-la-Humanidad-por-la-Unesco-Mayura-restauran.jpg", desc: "Famous for its world-class tea and the stunning view of Kanchenjunga, Darjeeling offers a mix of Tibetan culture and natural beauty. The toy train ride is a highlight for every group." },
+            { name: "Gangtok", category: "hill", img: "https://i.postimg.cc/9XYn0X40/Gangtok-India-The-Himalayan-Gem-You-Can-t-Miss.jpg", desc: "The clean and vibrant capital of Sikkim is a center for Buddhist learning. Visit the Rumtek Monastery and enjoy the clouds touching the mountain tops." },
+
+            // HISTORICAL (10)
+            { name: "Taj Mahal", category: "history", img: "https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=400&q=80", desc: "A UNESCO World Heritage site and one of the Seven Wonders of the World. Built by Emperor Shah Jahan in memory of Mumtaz Mahal." },
+            { name: "Red Fort", category: "history", img: "https://images.unsplash.com/photo-1587474260584-1f20d4296c06?auto=format&fit=crop&w=400&q=80", desc: "Massive sandstone fortress in Delhi, representing the zenith of Mughal creativity." },
+            { name: "Hampi", category: "history", img: "https://images.unsplash.com/photo-1582234032274-06f157140e69?auto=format&fit=crop&w=400&q=80", desc: "Open-air museum of the Vijayanagara Empire across a surreal boulder landscape." },
+            { name: "Ajanta & Ellora Caves", category: "history", img: "https://images.unsplash.com/photo-1595180479767-427786f06a14?auto=format&fit=crop&w=400&q=80", desc: "Rock-cut caves featuring ancient Buddhist, Hindu, and Jain artwork near Nashik." },
+            { name: "Qutub Minar", category: "history", img: "https://images.unsplash.com/photo-1587474260584-1f20d4296c06?auto=format&fit=crop&w=400&q=80", desc: "The tallest brick minaret in the world, showcasing early Indo-Islamic architecture." },
+            { name: "Fatehpur Sikri", category: "history", img: "https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=400&q=80", desc: "Short-lived capital of the Mughal Empire under Akbar, perfectly preserved." },
+            { name: "Amer Fort", category: "history", img: "https://images.unsplash.com/photo-1599661046289-e318878567c4?auto=format&fit=crop&w=400&q=80", desc: "Magnificent Rajput military architecture perched on a hill in Jaipur." },
+            { name: "Khajuraho Temples", category: "history", img: "https://images.unsplash.com/photo-1595180479767-427786f06a14?auto=format&fit=crop&w=400&q=80", desc: "Famous for their Nagara-style architectural symbolism and erotic sculptures." },
+            { name: "Mahabodhi Temple", category: "history", img: "https://images.unsplash.com/photo-1621648232222-77709324d271?auto=format&fit=crop&w=400&q=80", desc: "The location where Siddhartha Gautama attained enlightenment." },
+            { name: "Mehrangarh Fort", category: "history", img: "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=400&q=80", desc: "One of the largest forts in India, stands 400 feet above Jodhpur." },
+
+            // WILDLIFE (10)
+            { name: "Jim Corbett", category: "wildlife", img: "https://i.postimg.cc/25MjJFdn/Jim-Corbett-National-Park-Corbett-Traveler-s-Guide-2024.jpg", desc: "India's first national park in Uttarakhand, a haven for tigers and elephants." },
+            { name: "Kaziranga", category: "wildlife", img: "https://i.postimg.cc/nhX6583g/Kaziranga-National-Park-Travel-Guide.jpg", desc: "UNESCO site in Assam, home to two-thirds of the world's great one-horned rhinos." },
+            { name: "Ranthambore", category: "wildlife", img: "https://i.postimg.cc/PrR713dg/Jaipur-to-Ranthambore-National-Park-Private-One-Day-Trip.jpg", desc: "Once a private hunting ground, now a premier Tiger Reserve in Rajasthan." },
+            { name: "Bandhavgarh", category: "wildlife", img: "https://i.postimg.cc/sgzTYttn/Bandhavgarh-National-Park-Madhya-Pradesh.jpg", desc: "Known for having the highest density of Royal Bengal Tigers in India." },
+            { name: "Kanha", category: "wildlife", img: "https://i.postimg.cc/dV0yc6C5/Guide-to-Kanha-National-Park-Tiger-Reserve-Breathedreamgo.jpg", desc: "Inspiration for Rudyard Kipling's 'The Jungle Book' in MP." },
+            { name: "Sundarbans", category: "wildlife", img: "https://i.postimg.cc/FsdMC5Ww/Explore-Sundarban.jpg", desc: "World's largest mangrove forest and home to swimming Tigers." },
+            { name: "Gir National Park", category: "wildlife", img: "https://i.postimg.cc/mDkXcCKm/When-Is-Gir-National-Park-Closed.jpg", desc: "Last remaining refuge of the Asiatic Lion in the world, in Gujarat." },
+            { name: "Nagarhole", category: "wildlife", img: "https://i.postimg.cc/4Ng0P7cN/50-Panthere-Noire-Wallpapers-Free-download-Best-Collection.jpg", desc: "Premier tiger and elephant reserve in Karnataka." },
+            { name: "Satpura", category: "wildlife", img: "https://i.postimg.cc/PxbW5xqf/Satpura.jpg", desc: "A hidden gem in Madhya Pradesh for walking safaris and canoeing." },
+            { name: "Pench", category: "wildlife", img: "https://i.postimg.cc/mZ89XKzH/Pench-National-Park-Weekend-Tour-from-Nagpur.jpg", desc: "Stunning teak forest famous for leopard sightings." },
+
+            // BEACHES (10)
+            { name: "Goa", category: "beach", img: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=400&q=80", desc: "India's most popular beach destination with palm-fringed sands." },
+            { name: "Alibaug", category: "beach", img: "https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?auto=format&fit=crop&w=400&q=80", desc: "Known for its clean beaches and historical sea forts near Nashik." },
+            { name: "Puri Beach", category: "beach", img: "https://images.unsplash.com/photo-1621648232222-77709324d271?auto=format&fit=crop&w=400&q=80", desc: "Unique for its religious significance and golden sand festivals." },
+            { name: "Gokarna", category: "beach", img: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=400&q=80", desc: "Land of pristine, Om-shaped beaches and untouched coastal beauty." },
+            { name: "Digha", category: "beach", img: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=400&q=80", desc: "West Bengal's resort town famous for flat beaches and fresh seafood." },
+            { name: "Visakhapatnam", category: "beach", img: "https://images.unsplash.com/photo-1582234032274-06f157140e69?auto=format&fit=crop&w=400&q=80", desc: "Vizag offers scenic beaches and a unique submarine museum." },
+            { name: "Kovalam", category: "beach", img: "https://images.unsplash.com/photo-1593181629936-11c609b8db9b?auto=format&fit=crop&w=400&q=80", desc: "Kerala's finest beach with an iconic lighthouse and crescent coastline." },
+            { name: "Tarkarli", category: "beach", img: "https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?auto=format&fit=crop&w=400&q=80", desc: "Hidden gem for scuba diving and Konkan culture." },
+            { name: "Daman", category: "beach", img: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=400&q=80", desc: "Former Portuguese colony with relaxed coastal vibes." },
+            { name: "Mahabalipuram", category: "beach", img: "https://images.unsplash.com/photo-1582234032274-06f157140e69?auto=format&fit=crop&w=400&q=80", desc: "Ancient stone-cut monuments right by the Bay of Bengal." },
+
+            // SPIRITUAL (10)
+            { name: "Shirdi", category: "spiritual", img: "https://images.unsplash.com/photo-1616070258055-63f2ed2903e1?auto=format&fit=crop&w=400&q=80", desc: "Home of Sai Baba, providing peace to millions of devotees." },
+            { name: "Trimbakeshwar", category: "spiritual", img: "https://images.unsplash.com/photo-1621648232222-77709324d271?auto=format&fit=crop&w=400&q=80", desc: "Sacred Jyotirlinga at the source of River Godavari." },
+            { name: "Amritsar", category: "spiritual", img: "https://images.unsplash.com/photo-1514222134-b57cbb8ce073?auto=format&fit=crop&w=400&q=80", desc: "Heart of Sikhism and home to the divine Golden Temple." },
+            { name: "Kedarnath", category: "spiritual", img: "https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=400&q=80", desc: "Ancient Himalayan temple dedicated to Lord Shiva." },
+            { name: "Rameshwaram", category: "spiritual", img: "https://images.unsplash.com/photo-1582234032274-06f157140e69?auto=format&fit=crop&w=400&q=80", desc: "Sacred island temple where Lord Rama built the bridge." },
+            { name: "Jagannath Puri", category: "spiritual", img: "https://images.unsplash.com/photo-1621648232222-77709324d271?auto=format&fit=crop&w=400&q=80", desc: "Coastal spiritual site famous for the Rath Yatra." },
+            { name: "Badrinath", category: "spiritual", img: "https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=400&q=80", desc: "Himalayan temple dedicated to Lord Vishnu." },
+            { name: "Tirupati", category: "spiritual", img: "https://images.unsplash.com/photo-1582234032274-06f157140e69?auto=format&fit=crop&w=400&q=80", desc: "Richest temple in the world dedicated to Lord Venkateswara." },
+            { name: "Haridwar", category: "spiritual", img: "https://images.unsplash.com/photo-1561359313-0639aad49ca6?auto=format&fit=crop&w=400&q=80", desc: "Gateway where the Ganges meets the plains." },
+            { name: "Siddhivinayak", category: "spiritual", img: "https://images.unsplash.com/photo-1566550970639-5d633390f772?auto=format&fit=crop&w=400&q=80", desc: "Mumbai's famous temple seeking blessings from Lord Ganesha." }
+        ];
+
+        let currentDept = "top";
+        function slideDest(dir) { document.getElementById('destContainer').scrollLeft += dir * 300; }
+        function changeDept(dept) { currentDept = dept; document.querySelectorAll('.dept-btn').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); filterDestinations(); }
+        
+        function filterDestinations() {
+            const query = document.getElementById('destSearch').value.toLowerCase();
+            const container = document.getElementById('destContainer'); container.innerHTML = "";
+            const filtered = destinations.filter(d => (currentDept === "top" ? (d.category === 'hill' || d.category === 'top') : d.category === currentDept) && d.name.toLowerCase().includes(query));
+            filtered.forEach(d => {
+                container.innerHTML += `<div class="dest-card bg-gray-50 rounded-2xl overflow-hidden shadow-md border border-gray-100 text-center"><img src="${d.img}" class="w-full h-40 object-cover"><div class="p-4 text-center"><h4 class="font-black uppercase text-sm mb-3 italic">${d.name}</h4><button onclick="exploreDestination('${d.name}')" class="w-full text-[10px] bg-orange-600 text-white font-black py-2 rounded-lg uppercase">Explore</button></div></div>`;
+            });
+        }
+
+        function exploreDestination(name) {
+            const place = destinations.find(d => d.name === name);
+            if(!place) return;
+            document.getElementById('exploreImg').src = place.img;
+            document.getElementById('exploreTitle').innerText = place.name;
+            document.getElementById('exploreDesc').innerText = place.desc || "Experience the majestic beauty and history of " + place.name + " with Jay Janardhan Tours and Travels. We provide safe and comfortable group journeys across All India.";
+            document.getElementById('exploreSetBtn').onclick = () => { document.getElementById('endNode').value = place.name; window.scrollTo({top:0, behavior:'smooth'}); closeExplore(); };
+            document.getElementById('exploreModal').style.display = 'flex';
+        }
+
+        function closeExplore() { document.getElementById('exploreModal').style.display = 'none'; }
+        filterDestinations();
+
+        const GARAGE_LOCATION = "Nashik, Maharashtra";
+        var map = L.map('map').setView([19.9975, 73.7898], 8); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        var selectedVehicle="", currentAcPrice=0, currentNonAcPrice=0, journeyDist=0, garageRunning=0, totalKM=0, routingControl=null, tripType="One Way", selectedType="";
+        
+        async function calculateTrip() {
+            const cN = document.getElementById('custName').value;
+            const cP = document.getElementById('custPhone').value;
+            const cE = document.getElementById('custEmail').value;
+            if(!cN || !cP || !cE) { alert("Please fill Name, Phone, and Email to calculate distance."); return; }
+
+            const sL = document.getElementById('startNode').value, eL = document.getElementById('endNode').value;
+            if(!sL || !eL){alert("Enter locations.");return;} if(routingControl) map.removeControl(routingControl); try { const gC = [19.9975, 73.7898], pC_r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${sL}`), dC_r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${eL}`); const pC_j = await pC_r.json(), dC_j = await dC_r.json(); const pC = [pC_j[0].lat, pC_j[0].lon], dC = [dC_j[0].lat, dC_j[0].lon]; const gToP_f = await fetch(`https://router.project-osrm.org/route/v1/driving/${gC[1]},${gC[0]};${pC[1]},${pC[0]}?overview=false`); const gToP_j = await gToP_f.json(); const gToP = sL.toLowerCase().includes("nashik")?0:gToP_j.routes[0].distance/1000; const pToD_f = await fetch(`https://router.project-osrm.org/route/v1/driving/${pC[1]},${pC[0]};${dC[1]},${dC[0]}?overview=false`); const pToD_j = await pToD_f.json(); const pToD = pToD_j.routes[0].distance/1000; if(tripType==="Round Trip"){ journeyDist = pToD * 2; garageRunning = gToP + gToP; } else { journeyDist = pToD; const dToG_f = await fetch(`https://router.project-osrm.org/route/v1/driving/${dC[1]},${dC[0]};${gC[1]},${gC[0]}?overview=false`); const dToG_j = await dToG_f.json(); const dToG = eL.toLowerCase().includes("nashik")?0:dToG_j.routes[0].distance/1000; garageRunning = gToP + dToG; } totalKM=(parseFloat(journeyDist)+parseFloat(garageRunning)).toFixed(1); routingControl=L.Routing.control({waypoints:[L.latLng(pC),L.latLng(dC)],createMarker:()=>null}).addTo(map); document.getElementById('trip-stats').classList.remove('hidden'); document.getElementById('dist-display').innerText=totalKM+" km"; } catch(e){alert("Error.");} 
+        }
+
+        function openBooking(v,n,a){ selectedVehicle=v; currentNonAcPrice=n; currentAcPrice=a; document.getElementById('modalTitle').innerText=v; document.getElementById('acKmRate').innerText="Rate: ₹"+a+"/km"; document.getElementById('nonAcKmRate').innerText="Rate: ₹"+n+"/km"; if(totalKM>0){ document.getElementById('acPriceDisplay').innerText="Total: ₹"+Math.round(totalKM*a); document.getElementById('nonAcPriceDisplay').innerText="Total: ₹"+Math.round(totalKM*n); } document.getElementById('bookingModal').style.display='flex'; }
+        function closeBooking(){ document.getElementById('bookingModal').style.display='none'; }
+        function closeInvoice(){ document.getElementById('invoiceModal').style.display='none'; }
+        function setTripType(t){ tripType=t; document.getElementById('oneWayBtn').classList.toggle('active', t==='One Way'); document.getElementById('roundTripBtn').classList.toggle('active', t==='Round Trip'); if(totalKM>0) calculateTrip(); }
+
+        function confirmBooking(t){
+            selectedType = t; const r = (t==='Non-AC') ? currentNonAcPrice : currentAcPrice;
+            document.getElementById('invCust').innerText = document.getElementById('custName').value || "Customer";
+            document.getElementById('invPhone').innerText = document.getElementById('custPhone').value || "--";
+            document.getElementById('invEmail').innerText = document.getElementById('custEmail').value || "--";
+            document.getElementById('invFrom').innerText = document.getElementById('startNode').value;
+            document.getElementById('invTo').innerText = document.getElementById('endNode').value;
+            document.getElementById('invTripDist').innerText = parseFloat(journeyDist).toFixed(1) + " km";
+            document.getElementById('invGarageDist').innerText = parseFloat(garageRunning).toFixed(1) + " km";
+            document.getElementById('invTotalDist').innerText = totalKM;
+            document.getElementById('invDate').innerText = "Date: " + new Date().toLocaleDateString();
+            document.getElementById('invVehicle').innerText = selectedVehicle + " (" + t + ")";
+            document.getElementById('invRate').innerText = "₹" + r + " / KM";
+            document.getElementById('invTotalBill').innerText = "₹" + Math.round(totalKM * r);
+            closeBooking(); document.getElementById('invoiceModal').style.display = 'flex';
+        }
+
+        function sendToWhatsApp(){ 
+            const r=(selectedType==='Non-AC')?currentNonAcPrice:currentAcPrice; 
+            
+            // DATA SAVING Logic[cite: 5]
+            const formData = new URLSearchParams();
+            formData.append("Name", document.getElementById('custName').value);
+            formData.append("Phone", document.getElementById('custPhone').value);
+            formData.append("Email", document.getElementById('custEmail').value);
+            formData.append("From", document.getElementById('startNode').value);
+            formData.append("To", document.getElementById('endNode').value);
+            formData.append("Vehicle", selectedVehicle);
+            formData.append("Type", selectedType);
+            formData.append("Total_KM", totalKM);
+            formData.append("Total_Bill", Math.round(totalKM * r));
+            fetch(DATABASE_URL, { method: "POST", body: formData, mode: "no-cors" });
+
+            const msg=`Hi Pravin, booking from Jay Janardhan.\n\nCustomer: ${document.getElementById('custName').value}\nPhone: ${document.getElementById('custPhone').value}\nRoute: ${document.getElementById('startNode').value} to ${document.getElementById('endNode').value}\nTotal KM: ${totalKM}\nVehicle: ${selectedVehicle} (${selectedType})\nBill: ₹${Math.round(totalKM * r)}`; 
+            window.open("https://wa.me/919763111320?text="+encodeURIComponent(msg), "_blank"); 
+        }
+
+        // --- DASHBOARD & CALENDAR LOGIC ---[cite: 5]
+        let bookingData = [];
+        let currentViewDate = new Date();
+
+        function openOwnerDashboard() { document.getElementById('ownerDashboard').style.display = 'flex'; }
+        function closeDashboard() { 
+            document.getElementById('ownerDashboard').style.display = 'none'; 
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('adminPass').value = "";
+        }
+        
+        function verifyAdmin() {
+            if(document.getElementById('adminPass').value === "JJAdmin123") {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('sheetLink').href = SHEET_URL;
+                fetchBookings();
+            } else { alert("Access Denied!"); }
+        }
+        function logoutAdmin() { closeDashboard(); }
+
+        async function fetchBookings() {
+            try {
+                const response = await fetch(DATABASE_URL);
+                bookingData = await response.json();
+                renderCalendar();
+                updateFleetStatus();
+                renderRequests();
+            } catch (e) { console.log("Fetch error."); }
+        }
+
+        function renderRequests() {
+            const queue = document.getElementById('requestQueue');
+            const pendings = bookingData.filter(b => b.status === "Pending");
+            
+            if(pendings.length === 0) {
+                queue.innerHTML = `<p class="text-[10px] text-gray-400 italic">No new requests.</p>`;
+                return;
+            }
+
+            queue.innerHTML = pendings.map(b => `
+                <div class="p-3 bg-white border-2 border-orange-100 rounded-xl shadow-sm">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[10px] font-black text-orange-600 uppercase">${b.vehicle}</span>
+                        <span class="text-[9px] font-bold text-gray-400">${b.name}</span>
+                    </div>
+                    <p class="text-[9px] font-bold text-gray-600 mb-2">FROM: ${b.from} | TO: ${b.destination}</p>
+                    <button onclick="approveBooking(${b.row})" class="w-full bg-green-600 text-white text-[9px] font-black py-2 rounded-lg uppercase shadow-sm transition hover:bg-green-700">Accept Booking</button>
+                </div>
+            `).join("");
+        }
+
+        async function approveBooking(row) {
+            const formData = new URLSearchParams();
+            formData.append("action", "approve");
+            formData.append("row", row);
+            alert("Updating booking status...");
+            await fetch(DATABASE_URL, { method: "POST", body: formData, mode: "no-cors" });
+            fetchBookings(); 
+        }
+
+        async function completeTrip(row) {
+            if(!confirm("Mark as completed? Vehicle will become AVAILABLE.")) return;
+            const formData = new URLSearchParams();
+            formData.append("action", "complete");
+            formData.append("row", row);
+            alert("Updating trip status...");
+            await fetch(DATABASE_URL, { method: "POST", body: formData, mode: "no-cors" });
+            fetchBookings();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendarDays');
+            grid.innerHTML = "";
+            const year = currentViewDate.getFullYear();
+            const month = currentViewDate.getMonth();
+            document.getElementById('monthDisplay').innerText = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(currentViewDate);
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < firstDay; i++) { grid.innerHTML += `<div></div>`; }
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                // Color the calendar for BOTH Approved and Completed trips to show history[cite: 5]
+                const dailyTrips = bookingData.filter(b => b.date.includes(dateStr) && (b.status === "Approved" || b.status === "Completed"));
+                grid.innerHTML += `<div onclick="showDayDetails('${dateStr}')" class="p-2 border rounded cursor-pointer transition text-[10px] font-bold ${dailyTrips.length > 0 ? 'bg-orange-500 text-white border-orange-600' : 'hover:bg-gray-100'}">${d}</div>`;
+            }
+        }
+
+        function showDayDetails(dateStr) {
+            // Show history (Approved or Completed) in report[cite: 5]
+            const bookings = bookingData.filter(b => b.date.includes(dateStr) && (b.status === "Approved" || b.status === "Completed"));
+            const panel = document.getElementById('dayDetail');
+            const content = document.getElementById('detailContent');
+            const formattedDate = new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+            document.getElementById('detailDate').innerText = "Report for " + formattedDate;
+            panel.classList.remove('hidden');
+
+            if (bookings.length > 0) {
+                content.innerHTML = bookings.map((b, index) => {
+                    const isOngoing = b.status === "Approved";
+                    return `
+                    <div class="p-3 bg-gray-800 rounded-lg border-l-4 ${isOngoing ? 'border-orange-500 shadow-lg' : 'border-green-500 opacity-80'}">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="${isOngoing ? 'text-orange-400' : 'text-green-400'} uppercase font-black text-[11px] italic">${b.vehicle}</span>
+                            ${isOngoing ? `<button onclick="completeTrip(${b.row})" class="bg-blue-600 text-white text-[8px] px-2 py-1 rounded font-black uppercase shadow-md transition hover:bg-blue-700">Complete Trip</button>` : `<span class="text-[8px] text-green-500 font-bold uppercase tracking-widest">Completed ✅</span>`}
+                        </div>
+                        <p class="text-white text-[10px] font-bold mb-1"><i class="fas fa-map-marker-alt text-gray-500 mr-1"></i> FROM: <span class="text-gray-300 font-normal italic">${b.from || '--'}</span></p>
+                        <p class="text-white text-[10px] font-bold mb-2"><i class="fas fa-location-arrow text-gray-500 mr-1"></i> TO: <span class="text-gray-300 font-normal italic">${b.destination || '--'}</span></p>
+                        <div class="flex gap-4 text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+                            <span><i class="fas fa-road mr-1"></i> ${b.km} KM</span>
+                            <span><i class="fas fa-user mr-1"></i> ${b.name}</span>
+                        </div>
+                    </div>`;
+                }).join("");
+            } else {
+                content.innerHTML = `<p class="text-gray-500 italic text-[10px] p-2 text-center">No active or past trips on this date.</p>`;
+            }
+        }
+
+        function changeMonth(dir) { currentViewDate.setMonth(currentViewDate.getMonth() + dir); renderCalendar(); }
+
+        function updateFleetStatus() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            // Only show fleet as busy for APPROVED bookings (Ongoing)[cite: 5]
+            const busyVehicles = bookingData.filter(b => b.date && b.date.includes(todayStr) && b.status === "Approved").map(b => b.vehicle);
+            const fleetMap = [{ id: "status-14", name: "14 Seater Tempo" }, { id: "status-50", name: "50 Seater Bus" }, { id: "status-26", name: "26 Seater Tempo" }];
+            fleetMap.forEach(car => {
+                const el = document.getElementById(car.id);
+                if (el) {
+                    if (busyVehicles.includes(car.name)) { el.innerText = "ON TRIP"; el.className = "text-orange-600 font-black uppercase"; }
+                    else { el.innerText = "AVAILABLE"; el.className = "text-green-600 font-black uppercase"; }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
